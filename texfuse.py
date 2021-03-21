@@ -1,5 +1,5 @@
 # ==================================================================
-# FaceFuse 
+# TexFuse 
 #
 # Copyright (C) 2021 argenycw <argencwyan@gmail.com>
 # under WTFPL v2 Public License
