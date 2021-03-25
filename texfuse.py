@@ -31,7 +31,9 @@ if __name__ == '__main__':
     parser.add_argument('--eps', default=50, type=int, help='Maximum perturbation strength (over 255)') 
     parser.add_argument('--iter', default=50, type=int, help='Number of iterations for projected gradient computation') 
     parser.add_argument('--step_size', default=5, type=int, help='Please just keep it as default, thanks.') 
-    parser.add_argument('--out', default='attack.png', type=str, help='The output filename for the attacked image.') 
+    parser.add_argument('-o', '--out', default='attack.png', type=str, help='The output filename for the attacked image.') 
+    parser.add_argument('-u', '--upsample', action='store_true', help='Upsample the perturbation rather than doublesample the output.')
+    parser.add_argument('-n', '--noresize', action='store_true', help='Prohibit the script from resizing the images (also accept rectanuglar shape)') 
     args = parser.parse_args()
 
     # load a pretrained VGG16 model on ImageNet 
@@ -59,8 +61,22 @@ if __name__ == '__main__':
         mean= [-0.485/0.229, -0.456/0.224, -0.406/0.255],
         std= [1/0.229, 1/0.224, 1/0.255]
     )
-    source_img = Image.open(source_img_path).resize((224, 224)).convert("RGB")
-    target_img = Image.open(target_img_path).resize((224, 224)).convert("RGB")
+
+    source_raw = Image.open(source_img_path).convert("RGB")
+    target_raw = Image.open(target_img_path).convert("RGB")
+    source_w, source_h = source_raw.size
+    target_w, target_h = target_raw.size    
+
+    if abs(1 - ((source_w / target_w) / (source_h / target_h))) > 0.1:
+        print('Warning: A huge difference between dimensions in source and target is detected. Note the image may be stretched to a certain degree.')
+    if args.noresize:
+        if source_w != target_w or source_h != target_h:
+            print('Resizing target (%d, %d) into source (%d, %d).' % (target_w, target_h, source_w, source_h))            
+        source_img = source_raw
+        target_img = target_raw.resize((source_w, source_h))
+    else:
+        source_img = source_raw.resize((224, 224))
+        target_img = target_raw.resize((224, 224))
 
     source_img = img_preprocess(source_img).unsqueeze(0)
     target_img = img_preprocess(target_img).unsqueeze(0)
@@ -91,6 +107,12 @@ if __name__ == '__main__':
         # log progress
         print('Iter: %d / %d. Feature Similarity: %f' % (i+1, num_iter, loss.item()), end='\r')        
     
+    # upsample the perturbation when set
+    if args.upsample:
+        delta = adv_img - source_img
+        delta_large = F.interpolate(delta, size=(source_h, source_w), mode='bicubic', align_corners=False)
+        adv_img = img_preprocess(source_raw) + delta_large
+
     outfile = join('output', args.out)
     save_image(unnormalize(adv_img.squeeze(0)), outfile)
     print("Attack Completed. Example is saved as %s" % outfile)

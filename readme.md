@@ -17,4 +17,12 @@ Example Usage:
 python texfuse.py --source <source image> --target <target image>
 ```
 
-Batch computation and GPU is currently not supported.
+The output image will be saved as `outputs/attack.png` by default. You can overwrite the path with the `-o` or `--out` argument.
+
+The script automatically resizes the picture into dimension 224x224. To disable such feature, use the `--noresize` argument:
+```
+python texfuse.py --source <source image> --target <target image> --out <output image> --noresize
+```
+Alternatively, you can also consider upsampling the perturbation with the argument `-u` or `--upsample`.
+
+Batch computation and GPU are currently not supported.
