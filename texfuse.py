@@ -19,10 +19,17 @@ import torchvision.transforms as transforms
 from torchvision.utils import save_image
 from torch.autograd.gradcheck import zero_gradients
 
-intermediate_features = []
 def capture_feature(module, input, output):
     global intermediate_features
     intermediate_features.append(output)
+
+# return a model with reduction in modules/layers
+# so far hard-coded for VGG16
+def vgg16_manipulate(vgg16):
+    vgg16.features = vgg16.features[:16]
+    vgg16.avgpool = torch.nn.Identity()
+    vgg16.classifier = torch.nn.Identity()
+    return vgg16
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='FaceFuse by AG')
@@ -39,7 +46,8 @@ if __name__ == '__main__':
     # load a pretrained VGG16 model on ImageNet 
     # actually I am looking for models pretrained on face dataset instead :((((
     vgg16 = models.vgg16(pretrained=True) # TODO going to update this
-    vgg16.features[15].register_forward_hook(capture_feature)
+    vgg16 = vgg16_manipulate(vgg16)
+    #vgg16.features[15].register_forward_hook(capture_feature)
 
     # input validation
     if args.source == '' or args.target == '':
@@ -82,21 +90,21 @@ if __name__ == '__main__':
     target_img = img_preprocess(target_img).unsqueeze(0)
 
     # to capture the intial features
-    vgg16(source_img)
-    vgg16(target_img)
+    source_feature = vgg16(source_img)
+    target_feature = vgg16(target_img)
 
     num_iter = args.iter
     eps = args.step_size / 255.0
     max_eps = args.eps / 255.0
-    source_feature = intermediate_features[0]
-    target_feature = intermediate_features[1]
+    #source_feature = intermediate_features[0]
+    #target_feature = intermediate_features[1]
     adv_img = source_img.clone() + torch.zeros_like(source_img).uniform_(-eps, eps)
     for i in range(num_iter):
         adv_img.requires_grad_()
         zero_gradients(adv_img)
 
-        vgg16(adv_img)
-        feature = intermediate_features[-1]
+        feature = vgg16(adv_img)
+        #feature = intermediate_features[-1]
 
         loss = F.l1_loss(feature, target_feature)
         loss.backward(retain_graph=True)
